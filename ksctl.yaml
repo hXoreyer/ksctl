@@ -1,0 +1,22 @@
+server:
+  ip: xx.xxx.xxx.xxx
+  port: 22
+  account: root
+  password: xxxxxx
+commands:
+  - ls
+  - ps
+uploads:
+  -
+    src: ./ksctl.yaml
+    dst: /root/ksctl.yaml
+  -
+    src: ./xxxx
+    dst: /root/xxxx
+downloads:
+  -
+    src: /root/ksctl.yaml
+    dst: ./ksctl.yaml
+  -
+    src: ./xxxx
+    dst: /root/xxxx
