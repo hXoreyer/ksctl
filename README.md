@@ -42,3 +42,9 @@ git clone https://github.com/hxoreyer/ksctl
 go run ksctl.go -f [yaml文件地址(默认为./ksctl.yaml)]
 ```
 
+##### Release:
+
+```powershell
+ksctl.exe -f [yaml文件地址(默认为./ksctl.yaml)]
+```
+
