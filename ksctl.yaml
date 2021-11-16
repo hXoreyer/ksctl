@@ -1,22 +1,12 @@
 server:
-  ip: xx.xxx.xxx.xxx
+  ip: xx.xx.xxx.xx
   port: 22
-  account: root
-  password: xxxxxx
-commands:
-  - ls
-  - ps
+  account: xxxx
+  password: xxxx
 uploads:
   -
-    src: ./ksctl.yaml
-    dst: /root/ksctl.yaml
-  -
-    src: ./xxxx
-    dst: /root/xxxx
-downloads:
-  -
-    src: /root/ksctl.yaml
-    dst: ./ksctl.yaml
-  -
-    src: ./xxxx
-    dst: /root/xxxx
+    src: ./xxx
+    dst: /root/xxx
+exec:
+  name: /root/xxx
+  exit: true

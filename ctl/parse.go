@@ -12,6 +12,7 @@ type Yaml struct {
 	UploadFiles   []FileCtl  `yaml:"uploads"`
 	DownloadFiles []FileCtl  `yaml:"downloads"`
 	Commands      []string   `yaml:"commands"`
+	Exec          ExecShell  `yaml:"exec"`
 }
 
 type ServerAddr struct {
@@ -24,6 +25,11 @@ type ServerAddr struct {
 type FileCtl struct {
 	Src string `yaml:"src"`
 	Dst string `yaml:"dst"`
+}
+
+type ExecShell struct {
+	ProcName string `yaml:"name"`
+	Exit     bool   `yaml:"exit"`
 }
 
 func NewYaml(path string) *Yaml {
@@ -45,10 +51,15 @@ func (yal Yaml) Run() {
 	for _, v := range yal.UploadFiles {
 		srv.Upload(v.Src, v.Dst)
 	}
+	for _, v := range yal.DownloadFiles {
+		srv.Download(v.Src, v.Dst)
+	}
 	for _, v := range yal.Commands {
 		fmt.Println(srv.RunShell(v))
 	}
-	for _, v := range yal.DownloadFiles {
-		srv.Download(v.Src, v.Dst)
+	if yal.Exec.Exit {
+		srv.Run(yal.Exec.ProcName)
+	} else {
+		srv.RunShell(yal.Exec.ProcName)
 	}
 }

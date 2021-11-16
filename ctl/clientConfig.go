@@ -3,11 +3,13 @@ package ctl
 import (
 	"bytes"
 	"fmt"
-	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"os"
 	"os/exec"
+	"os/signal"
+	"path"
 	"sync"
 	"time"
 
@@ -107,58 +109,82 @@ func (cf *ClientConfig) RunShell(shell string) string {
 }
 
 func (cf *ClientConfig) Upload(srcPath, dstPath string) {
-	srcFile, _ := os.Open(srcPath)
-	dstFile, _ := cf.sftpClient.Create(dstPath)
+	fmt.Println("searching...")
+	s, err := os.Stat(srcPath)
+	if err != nil {
+		panic(err)
+	}
+	if s.IsDir() {
+		cf.uploadDirectory(srcPath, dstPath)
+	} else {
+		cf.uploadFile(srcPath, dstPath)
+	}
+}
 
-	defer func() {
-		_ = srcFile.Close()
-		_ = dstFile.Close()
-	}()
+func (cf *ClientConfig) uploadDirectory(srcPath, dstPath string) {
 
-	buffer := bytes.Buffer{}
-	buf := make([]byte, 1024)
-	for {
-		n, err := srcFile.Read(buf)
-		if err != nil {
-			if err != io.EOF {
-				log.Fatalf("read file error: %s", err.Error())
-			} else {
-				break
-			}
+	localFiles, err := ioutil.ReadDir(srcPath)
+	if err != nil {
+		panic(err)
+	}
+	cf.sftpClient.Mkdir(dstPath)
+
+	for _, backupDir := range localFiles {
+		localFilePath := path.Join(srcPath, backupDir.Name())
+		remoteFilePath := path.Join(dstPath, backupDir.Name())
+
+		if backupDir.IsDir() {
+			cf.sftpClient.Mkdir(remoteFilePath)
+			cf.uploadDirectory(localFilePath, remoteFilePath)
+		} else {
+			cf.uploadFile(localFilePath, remoteFilePath)
 		}
-		buffer.Write(buf[:n])
+	}
+}
+
+func (cf *ClientConfig) uploadFile(srcPath, dstPath string) {
+	srcFile, err := os.Open(srcPath)
+	if err != nil {
+		panic("os.Open error : " + err.Error() + srcPath)
 	}
 
+	defer srcFile.Close()
+
+	dstFile, err := cf.sftpClient.Create(dstPath)
+	if err != nil {
+		panic("sftpClient.Create error : " + err.Error())
+
+	}
+
+	defer dstFile.Close()
+	ff, err := ioutil.ReadAll(srcFile)
+	if err != nil {
+		panic("ReadAll error : " + err.Error())
+	}
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
-		str := "Uploading: ="
+		stat, _ := dstFile.Stat()
+		state2, _ := srcFile.Stat()
+		bar := KBar{}
+		bar.New(stat.Size(), state2.Size(), dstFile.Name())
 		for {
 			stat, _ := dstFile.Stat()
-			state2, _ := srcFile.Stat()
-			if stat.Size() <= state2.Size() {
-				var ft float64
-				ft = float64(stat.Size()) / float64(state2.Size())
-				for i := 0; i < int(ft*100)/2; i++ {
-					str += "="
-				}
-				str += ">"
-				fmt.Printf("%s %d%%\n", str, int64(ft*100))
-				str = "Upload: ="
-				if stat.Size() == state2.Size() {
-					fmt.Println("Upload complete")
-					break
-				}
+			if stat.Size() < state2.Size() {
+				bar.Play(stat.Size())
+				time.Sleep(time.Duration(100 * time.Millisecond))
 			} else {
+				bar.Play(stat.Size())
+				bar.Finish()
 				break
 			}
-			time.Sleep(time.Millisecond * 200)
 		}
 		wg.Done()
 	}()
-	_, _ = dstFile.Write(buffer.Bytes())
+	dstFile.Write(ff)
 	dstFile.Chmod(0777)
 	wg.Wait()
+
 }
 
 func (cf *ClientConfig) Download(srcPath, dstPath string) {
@@ -177,16 +203,10 @@ func (cf *ClientConfig) Download(srcPath, dstPath string) {
 	fmt.Println("download success")
 }
 
-func (cf *ClientConfig) waitForQuit(exitCode string) {
-	var s string
-	for {
-		fmt.Scanf("%s", &s)
-		if s == exitCode {
-			break
-		} else {
-			fmt.Println(s)
-		}
-	}
+func (cf *ClientConfig) waitForQuit() {
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, os.Kill)
+	<-c
 }
 
 func BuildExec(path, system, name string) {
@@ -200,10 +220,11 @@ func BuildExec(path, system, name string) {
 	_ = cmd.Run()
 }
 
-func (cf *ClientConfig) Run(exitCode, procName string) {
+func (cf *ClientConfig) Run(procName string) {
 	defer func() {
-		pid := cf.RunShell(fmt.Sprintf("pgrep %s", procName))
+		pid := cf.RunShell(fmt.Sprintf("pgrep %s", path.Base(procName)))
 		cf.RunShell(fmt.Sprintf("kill %s", pid))
 	}()
-	cf.waitForQuit(exitCode)
+	go cf.RunShell(procName)
+	cf.waitForQuit()
 }
