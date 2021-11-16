@@ -28,8 +28,8 @@ downloads:
     src: ./xxxx
     dst: /root/xxxx
 exec:
-	name: /xxx/xxx
-	exit: true
+    name: /xxx/xxx
+    exit: true
 ```
 
 server为服务器配置
